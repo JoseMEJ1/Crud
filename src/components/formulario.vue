@@ -1,65 +1,61 @@
+<template>
+  <div class="card">
+    Agregar {{ tabla }}
+  <div class="card-header">
+  </div>
+  <div class="card-body">
+    <form @submit.prevent="Insertar">
+    <div v-for="(campo, index) in labels" :key="index" class="mb-3">
+      <label :for="campo" class="form-label">
+        {{ campo }}
+      </label>
+      <input
+        type="text"
+        class="form-control form-control-lg"
+        :id="campo"
+        :placeholder="campo"
+        v-model="json[campo]"
+      />
+    </div>
+    <button type="submit" class="btn btn-success">
+      Agregar
+    </button>
+  </form>
+  </div>
+</div>
+</template>
+
 <script setup>
-import { ref, watch } from 'vue';
+import { reactive } from 'vue';
+import axios from 'axios';
 
 const props = defineProps({
-  formulario: Array
-});
-const emit = defineEmits(['agregar-dato']);
-
-const formData = ref({});
-
-watch(
-  () => props.formulario,
-  (newForm) => {
-    formData.value = Object.fromEntries(newForm.map(campo => [campo, '']));
+  labels: {
+    type: Array,
+    required: true
   },
-  { immediate: true }
-);
+  tabla: {
+    type: String,
+    default: 'personajes'
+  }
+});
+const json = reactive({});
+props.labels.forEach((campo) => {
+  json[campo] = "";
+});
 
-const enviarFormulario = async () => {
-  emit('agregar-dato', { ...formData.value });
-
-  const payload = {
-    nombre: formData.value.nombre,
-    edad: formData.value.edad,
-    pais_origen: formData.value.pais, 
-    oficio: formData.value.oficio
-  };
-
+const Insertar = async () => {
+  console.log(json);
   try {
-    const response = await fetch('http://localhost:3000/api/insertar/personajes', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) {
-      throw new Error('Error en la petición');
-    }
-    const result = await response.json();
-    console.log('Respuesta de la API:', result);
-
-    formData.value = Object.fromEntries(props.formulario.map(campo => [campo, '']));
+    const response = await axios.post(
+      `http://localhost:3000/api/insertar/${props.tabla}`,
+      json,
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    console.log("Datos insertados:", response.data);
+    window.location.reload();
   } catch (error) {
-    console.error('Error al enviar los datos:', error);
+    console.error("Error al insertar datos:", error);
   }
 };
 </script>
-
-<template>
-  <div class="col-4">
-    <form @submit.prevent="enviarFormulario">
-      <div v-for="(contenido, i) in formulario" :key="i">
-        <label class="form-label">{{ contenido }}</label>
-        <input 
-          type="text" 
-          v-model="formData[contenido]" 
-          class="form-control" 
-          :id="contenido"
-        />
-      </div>
-      <button type="submit" class="btn btn-dark">Guardar</button>
-    </form>
-  </div>
-</template>
