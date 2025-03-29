@@ -14,4 +14,57 @@
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>
+  <style>/* Estilos globales */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+    }
+    
+    /* Tipografía */
+    h1, h2, h3, h4 {
+      font-weight: 600;
+      color: #2c3e50;
+    }
+    
+    /* Utilidades */
+    .text-center {
+      text-align: center;
+    }
+    
+    /* Animaciones */
+    .fade-enter-active,
+    .fade-leave-active {
+      transition: opacity 0.3s ease;
+    }
+    
+    .fade-enter-from,
+    .fade-leave-to {
+      opacity: 0;
+    }
+    
+    /* Scroll personalizado */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: #bdc3c7;
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: #95a5a6;
+    }</style>
 </html>

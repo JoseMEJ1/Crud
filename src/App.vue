@@ -1,133 +1,138 @@
 <script setup>
 import { ref } from 'vue';
 import axios from 'axios';
-import Tabla_Impresion from './components/tabla.vue';
+import TablaImpresion from './components/tabla.vue';
 
 const contenido = ref([]);
 const encabezados = ref([]);
 const tablaSeleccionada = ref('');
-const mensajeError = ref('');
+const mensajeError = ref("");
 const registroAEditar = ref({});
 const mostrarModalEditar = ref(false);
-const ErrorEditar = ref(false);
 const mostrarModalEliminar = ref(false);
 const idAEliminar = ref(null);
 const nombreAEliminar = ref('');
-const ErrorEliminar = ref(false);
 const mostrarModalAgregar = ref(false);
 const nuevoRegistro = ref({});
-const ErrorAgrega = ref(false);
 
-// Modal
 const cerrarModal = () => {
   mostrarModalEliminar.value = false;
   mostrarModalAgregar.value = false;
   mostrarModalEditar.value = false;
+  mensajeError.value = "";
 };
 
-// Editar
 const mostrarEditar = (registro) => {
   registroAEditar.value = { ...registro };
   nuevoRegistro.value = { ...registro };
   mostrarModalEditar.value = true;
-  ErrorEditar.value = false;
 };
 
-const EditarRegistro = async () => {
+const editarRegistro = async () => {
   try {
-    const idKey = tablaSeleccionada.value === 'producto' ? 'id_producto' : 'id_proveedor';
+    const idKey = tablaSeleccionada.value === "producto" ? "id_producto" : "id_proveedor";
     const id = registroAEditar.value[idKey];
+    
+    if (!id) throw new Error("ID no válido");
+    
     const url = `http://localhost:3000/api/editar/${tablaSeleccionada.value}/${id}`;
     const { [idKey]: _, ...datosActualizados } = nuevoRegistro.value;
+    
     await axios.put(url, datosActualizados);
     await mostrarTabla(tablaSeleccionada.value);
     cerrarModal();
   } catch (error) {
-    mensajeError.value = `Error al actualizar ${tablaSeleccionada.value}: ${error.response?.data?.message || error.message}`;
-    ErrorEditar.value = true;
+    mensajeError.value = error.response?.data?.error || error.message;
   }
 };
 
-// Eliminar
-const mostrarEliminar = (data) => {
-  idAEliminar.value = data.id;
-  nombreAEliminar.value = data.nombre;
+const mostrarEliminar = (registro) => {
+  const idKey = tablaSeleccionada.value === "producto" ? "id_producto" : "id_proveedor";
+  const nombreKey = tablaSeleccionada.value === "producto" ? "nombre_producto" : "nombre_proveedor";
+  
+  idAEliminar.value = registro[idKey];
+  nombreAEliminar.value = registro[nombreKey] || `Registro ${registro[idKey]}`;
   mostrarModalEliminar.value = true;
-  ErrorEliminar.value = false;
 };
 
 const confirmarEliminacion = async () => {
-  const url = `http://localhost:3000/api/eliminar/${tablaSeleccionada.value}/${idAEliminar.value}`;
   try {
+    if (!idAEliminar.value) throw new Error("ID no especificado");
+    
+    const url = `http://localhost:3000/api/eliminar/${tablaSeleccionada.value}/${idAEliminar.value}`;
     await axios.delete(url);
     await mostrarTabla(tablaSeleccionada.value);
     cerrarModal();
   } catch (error) {
-    mensajeError.value = `Error al eliminar ${tablaSeleccionada.value}: ${error.response?.data?.message || error.message}`;
-    ErrorEliminar.value = true;
+    mensajeError.value = error.response?.data?.error || error.message;
   }
 };
 
-// Agregar
 const mostrarModalAgregarRegistro = () => {
   nuevoRegistro.value = {};
-  encabezados.value.forEach((header) => {
-    nuevoRegistro.value[header.column_name] = '';
+  encabezados.value.forEach(header => {
+    if (!header.column_name.includes('id_') || 
+        (tablaSeleccionada.value === 'producto' && header.column_name === 'id_proveedor')) {
+      nuevoRegistro.value[header.column_name] = '';
+    }
   });
   mostrarModalAgregar.value = true;
 };
 
 const agregarRegistro = async () => {
-  const datos = {};
-  encabezados.value.forEach((columna) => {
-    const valor = nuevoRegistro.value[columna.column_name];
-    if (valor !== undefined && valor !== null && valor !== '') {
-      datos[columna.column_name] = valor;
-    }
-  });
   try {
+    const datos = {};
+    
+    encabezados.value.forEach(columna => {
+      const valor = nuevoRegistro.value[columna.column_name];
+      if (valor !== undefined && valor !== null && valor !== '') {
+        datos[columna.column_name] = valor;
+      }
+    });
+
+    if (tablaSeleccionada.value === 'producto' && !datos.id_proveedor) {
+      throw new Error("Debe especificar un proveedor para el producto");
+    }
+    
+    if (Object.keys(datos).length === 0) throw new Error("No hay datos válidos");
+    
     const url = `http://localhost:3000/api/agregar/${tablaSeleccionada.value}`;
     await axios.post(url, datos);
     await mostrarTabla(tablaSeleccionada.value);
-    mostrarModalAgregar.value = false;
+    cerrarModal();
   } catch (error) {
-    ErrorAgrega.value = true;
-    mensajeError.value = 'Error al agregar el registro.';
+    mensajeError.value = error.response?.data?.error || error.message;
   }
 };
 
-// Leer
 const mostrarTabla = async (tabla) => {
-  tablaSeleccionada.value = tabla;
   try {
-    const responseContenido = await axios.get(`http://localhost:3000/api/seleccionarcontenido/${tabla}`);
-    contenido.value = Array.isArray(responseContenido.data) ? responseContenido.data : [];
-
-    const responseEncabezados = await axios.get(`http://localhost:3000/api/seleccionarencabezado/${tabla}`);
-    encabezados.value = Array.isArray(responseEncabezados.data) ? responseEncabezados.data : [];
-
-    nuevoRegistro.value = {};
-    encabezados.value.forEach((header) => {
-      nuevoRegistro.value[header.nombre] = '';
-    });
-    if (tabla === 'producto') {
-      nuevoRegistro.value['id_proveedor'] = '';
-    }
+    contenido.value = [];
+    encabezados.value = [];
+    mensajeError.value = "";
+    
+    const [contenidoRes, encabezadosRes] = await Promise.all([
+      axios.get(`http://localhost:3000/api/seleccionarcontenido/${tabla}`),
+      axios.get(`http://localhost:3000/api/seleccionarencabezado/${tabla}`)
+    ]);
+    
+    tablaSeleccionada.value = tabla;
+    contenido.value = contenidoRes.data || [];
+    encabezados.value = encabezadosRes.data || [];
   } catch (error) {
-    console.error('Error al obtener los datos:', error);
+    mensajeError.value = error.response?.data?.error || error.message;
   }
 };
-
 </script>
 
 <template>
   <div class="sidebar">
     <h4 class="Titulo_Panel">Panel Tablas <i class="bi bi-folder"></i></h4>
     <button class="btn btn-secondary" @click="mostrarTabla('producto')">
-      <i class="bi bi-box"></i> Productos <i class="bi bi-rocket-takeoff"></i>
+      <i class="bi bi-box"></i> Productos
     </button>
     <button class="btn btn-secondary" @click="mostrarTabla('proveedor')">
-      <i class="bi bi-person-lines-fill"></i> Proveedor <i class="bi bi-truck"></i>
+      <i class="bi bi-person-lines-fill"></i> Proveedor
     </button>
   </div>
 
@@ -138,9 +143,13 @@ const mostrarTabla = async (tabla) => {
       </div>
     </nav>
 
+    <div v-if="mensajeError" class="alert alert-danger" role="alert">
+      <i class="bi bi-exclamation-triangle"></i> {{ mensajeError }}
+    </div>
+
     <div v-if="!tablaSeleccionada">
       <div class="alert alert-primary" role="alert">
-        <i class="bi bi-info-circle"></i> Selecciona una tabla para visualizar su contenido.
+        <i class="bi bi-info-circle"></i> Selecciona una tabla
       </div>
     </div>
 
@@ -149,152 +158,128 @@ const mostrarTabla = async (tabla) => {
         <div class="row">
           <div class="col-9">
             <h5 style="color: white;">
-              <i class="bi bi-bag-check"></i> Tabla de {{ tablaSeleccionada }} <i class="bi bi-fire"></i>
+              <i class="bi bi-bag-check"></i> Tabla de {{ tablaSeleccionada }}
             </h5>
           </div>
           <div class="col-3">
             <button type="button" class="btn btn-success" @click="mostrarModalAgregarRegistro">
-              <i class="bi bi-plus-circle"></i> Agregar {{ tablaSeleccionada }} <i class="bi bi-cloud-arrow-up-fill"></i>
+              <i class="bi bi-plus-circle"></i> Agregar
             </button>
           </div>
         </div>
-        <br>
       </div>
 
-      <Tabla_Impresion 
+      <TablaImpresion 
         :encabezados="encabezados" 
         :contenido="contenido" 
         :tabla="tablaSeleccionada"
         @mostrar-eliminar="mostrarEliminar"
         @mostrar-editar="mostrarEditar"
       />
-      <div v-if="contenido.length === 0" class="alert alert-danger" role="alert">
-        <i class="bi bi-cloud-slash"></i> La tabla {{ tablaSeleccionada }} se encuentra vacía.
+      
+      <div v-if="contenido.length === 0" class="alert alert-warning" role="alert">
+        <i class="bi bi-cloud-slash"></i> La tabla está vacía
       </div>
     </div>
 
-  </div>
-
-  <!-- Modal Eliminar -->
-  <div v-if="mostrarModalEliminar" class="custom-modal-overlay" @click.self="cerrarModal">
-    <div class="modal-dialog custom-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Eliminar {{ tablaSeleccionada }}</h5>
-          <button type="button" class="btn" @click="cerrarModal"><i class="bi bi-x-circle"></i></button>
-        </div>
-        <div class="modal-body">
-          <p>¿Seguro que deseas eliminar <strong>{{ nombreAEliminar }}</strong>?</p>
-          <div v-if="ErrorEliminar">
-            <div class="alert alert-danger" role="alert">
-              <p>{{ mensajeError }}</p>
+    <div v-if="mostrarModalEliminar" class="custom-modal-overlay" @click.self="cerrarModal">
+      <div class="modal-dialog custom-modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Eliminar {{ tablaSeleccionada }}</h5>
+            <button type="button" class="btn" @click="cerrarModal"><i class="bi bi-x-circle"></i></button>
+          </div>
+          <div class="modal-body">
+            <p>¿Eliminar <strong>{{ nombreAEliminar }}</strong>?</p>
+            <div v-if="mensajeError" class="alert alert-danger" role="alert">
+              <i class="bi bi-exclamation-triangle"></i> {{ mensajeError }}
             </div>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="cerrarModal">Cancelar</button>
-          <button class="btn btn-danger" @click="confirmarEliminacion"><i class="bi bi-trash"></i> Eliminar</button>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="cerrarModal">Cancelar</button>
+            <button class="btn btn-danger" @click="confirmarEliminacion">
+              <i class="bi bi-trash"></i> Eliminar
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Modal Agregar -->
-  <div v-if="mostrarModalAgregar" class="custom-modal-overlay" @click.self="cerrarModal">
-    <div class="modal-dialog custom-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Agregar {{ tablaSeleccionada }}</h5>
-          <button type="button" class="btn" @click="cerrarModal"><i class="bi bi-x-circle"></i></button>
-        </div>
-        <div class="modal-body">
-          <div v-for="(columna, index) in encabezados" :key="index">
-            <label>{{ columna.column_name }}</label>
-            <input
-              v-model="nuevoRegistro[columna.column_name]"
-              :placeholder="columna.column_name"
-              :id="columna.column_name"
-              :name="columna.column_name"
-              class="form-control"
-            />
+    <div v-if="mostrarModalAgregar" class="custom-modal-overlay" @click.self="cerrarModal">
+      <div class="modal-dialog custom-modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Agregar {{ tablaSeleccionada }}</h5>
+            <button type="button" class="btn" @click="cerrarModal"><i class="bi bi-x-circle"></i></button>
           </div>
-          <div v-if="ErrorAgrega">
-            <div class="alert alert-warning" role="alert">
-              <p id="textoerror">{{ mensajeError }}</p>
+          <div class="modal-body">
+            <div v-for="(columna, index) in encabezados" :key="index">
+              <template v-if="!columna.column_name.includes('id_') || 
+                            (tablaSeleccionada === 'producto' && columna.column_name === 'id_proveedor')">
+                <label>{{ columna.column_name }}</label>
+                <input
+                  v-model="nuevoRegistro[columna.column_name]"
+                  :placeholder="columna.column_name"
+                  class="form-control"
+                  :required="!columna.column_name.includes('id_') || columna.column_name === 'id_proveedor'"
+                />
+              </template>
+            </div>
+            <div v-if="mensajeError" class="alert alert-danger" role="alert">
+              <i class="bi bi-exclamation-triangle"></i> {{ mensajeError }}
             </div>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="cerrarModal"><i class="bi bi-x-circle"></i> Cancelar</button>
-          <button class="btn btn-primary" @click="agregarRegistro"><i class="bi bi-plus-circle"></i> Agregar</button>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="cerrarModal">
+              <i class="bi bi-x-circle"></i> Cancelar
+            </button>
+            <button class="btn btn-primary" @click="agregarRegistro">
+              <i class="bi bi-plus-circle"></i> Agregar
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Modal Editar -->
-  <div v-if="mostrarModalEditar" class="custom-modal-overlay" @click.self="cerrarModal">
-    <div class="modal-dialog custom-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Editar {{ tablaSeleccionada }}</h5>
-          <button type="button" class="btn" @click="cerrarModal"><i class="bi bi-x-circle"></i></button>
-        </div>
-        <div class="modal-body">
-          <div v-for="(columna, index) in encabezados" :key="index">
-            <label>{{ columna.column_name }}</label>
-            <input
-              v-model="nuevoRegistro[columna.column_name]"
-              :placeholder="columna.column_name"
-              :id="columna.column_name"
-              :name="columna.column_name"
-              class="form-control"
-            />
+    <div v-if="mostrarModalEditar" class="custom-modal-overlay" @click.self="cerrarModal">
+      <div class="modal-dialog custom-modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Editar {{ tablaSeleccionada }}</h5>
+            <button type="button" class="btn" @click="cerrarModal"><i class="bi bi-x-circle"></i></button>
           </div>
-          <div v-if="ErrorEditar">
-            <div class="alert alert-danger" role="alert">
-              <p>{{ mensajeError }}</p>
+          <div class="modal-body">
+            <div v-for="(valor, campo) in registroAEditar" :key="campo">
+              <template v-if="!campo.includes('id_') || 
+                            (tablaSeleccionada === 'producto' && campo === 'id_proveedor')">
+                <label>{{ campo }}</label>
+                <input
+                  v-model="nuevoRegistro[campo]"
+                  :placeholder="campo"
+                  class="form-control"
+                  :required="!campo.includes('id_') || campo === 'id_proveedor'"
+                />
+              </template>
+            </div>
+            <div v-if="mensajeError" class="alert alert-danger" role="alert">
+              <i class="bi bi-exclamation-triangle"></i> {{ mensajeError }}
             </div>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="cerrarModal">Cancelar</button>
-          <button class="btn btn-warning" @click="EditarRegistro"><i class="bi bi-pencil"></i> Editar</button>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="cerrarModal">
+              <i class="bi bi-x-circle"></i> Cancelar
+            </button>
+            <button class="btn btn-primary" @click="editarRegistro">
+              <i class="bi bi-pencil"></i> Guardar
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </div>
-
 </template>
 
-
 <style scoped>
-.form-control {
-  background: none;
-  border: none;
-  border-bottom: 2px solid #888;
-  color: #fff; 
-  padding: 8px;
-  font-size: 16px;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-.form-control:focus {
-  outline: none;
-  border-bottom: 2px solid #00bcd4;
-  box-shadow: 0 2px 5px rgba(0, 188, 212, 0.5);
-}
-
-.form-control::placeholder {
-  color: #bbb;
-  opacity: 0.7;
-}
-
-.custom-modal-overlay {
-  background-color: black;
-  color: white;
-}
-
 .sidebar {
   width: 250px;
   height: 100vh;
@@ -313,9 +298,7 @@ const mostrarTabla = async (tabla) => {
   border: none;
   color: #fff;
   padding: 8px;
-  font-size: 14px;
   cursor: pointer;
-  transition: background-color 0.3s;
 }
 
 .sidebar button:hover {
@@ -325,7 +308,6 @@ const mostrarTabla = async (tabla) => {
 .content {
   margin-left: 260px;
   padding: 20px;
-  font-size: 14px;
 }
 
 .custom-modal-overlay {
@@ -334,7 +316,7 @@ const mostrarTabla = async (tabla) => {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
   z-index: 1050;
   display: flex;
   align-items: center;
@@ -346,26 +328,38 @@ const mostrarTabla = async (tabla) => {
   border-radius: 8px;
   width: 90%;
   max-width: 500px;
+  color: white;
 }
 
-.modal-header, .modal-footer {
-  padding: 1rem;
+.form-control {
+  background: none;
+  border: none;
+  border-bottom: 2px solid #888;
+  color: #fff;
+  padding: 8px;
+  margin-bottom: 15px;
+}
+
+.form-control:focus {
+  outline: none;
+  border-bottom: 2px solid #00bcd4;
+}
+
+.Titulo_Panel {
+  color: #fff;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
   border-bottom: 1px solid #444;
 }
 
-.modal-body {
-  padding: 1rem;
+.table-title {
+  background: #343a40;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
 }
 
-.btn-close {
-  font-size: 1.5rem;
-  background: none;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-
-.btn-close:hover {
-  color: #00bcd4;
+.alert {
+  margin-top: 15px;
 }
 </style>
