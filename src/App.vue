@@ -15,6 +15,12 @@ const nombreAEliminar = ref('');
 const mostrarModalAgregar = ref(false);
 const nuevoRegistro = ref({});
 
+// Campos requeridos para cada tabla
+const camposRequeridos = {
+  producto: ['nombre', 'precio', 'existencia', 'id_proveedor'],
+  proveedor: ['nombre', 'rfc']
+};
+
 const cerrarModal = () => {
   mostrarModalEliminar.value = false;
   mostrarModalAgregar.value = false;
@@ -28,12 +34,46 @@ const mostrarEditar = (registro) => {
   mostrarModalEditar.value = true;
 };
 
+const validarDatos = (datos) => {
+  const errores = [];
+  
+  // Validar campos requeridos
+  camposRequeridos[tablaSeleccionada.value].forEach(campo => {
+    if (!datos[campo] && datos[campo] !== 0) {
+      errores.push(`El campo ${campo} es requerido`);
+    }
+  });
+  
+  // Validaciones específicas para productos
+  if (tablaSeleccionada.value === 'producto') {
+    if (datos.precio <= 0) {
+      errores.push('El precio debe ser mayor que 0');
+    }
+    if (datos.existencia < 0) {
+      errores.push('La existencia no puede ser negativa');
+    }
+  }
+  
+  // Validaciones específicas para proveedores
+  if (tablaSeleccionada.value === 'proveedor' && datos.rfc && datos.rfc.length !== 13) {
+    errores.push('El RFC debe tener 13 caracteres');
+  }
+  
+  return errores;
+};
+
 const editarRegistro = async () => {
   try {
     const idKey = tablaSeleccionada.value === "producto" ? "id_producto" : "id_proveedor";
     const id = registroAEditar.value[idKey];
     
     if (!id) throw new Error("ID no válido");
+    
+    // Validar datos antes de enviar
+    const errores = validarDatos(nuevoRegistro.value);
+    if (errores.length > 0) {
+      throw new Error(errores.join('\n'));
+    }
     
     const url = `http://localhost:3000/api/editar/${tablaSeleccionada.value}/${id}`;
     const { [idKey]: _, ...datosActualizados } = nuevoRegistro.value;
@@ -48,7 +88,7 @@ const editarRegistro = async () => {
 
 const mostrarEliminar = (registro) => {
   const idKey = tablaSeleccionada.value === "producto" ? "id_producto" : "id_proveedor";
-  const nombreKey = tablaSeleccionada.value === "producto" ? "nombre_producto" : "nombre_proveedor";
+  const nombreKey = "nombre"; // Corregido: ahora usa simplemente 'nombre'
   
   idAEliminar.value = registro[idKey];
   nombreAEliminar.value = registro[nombreKey] || `Registro ${registro[idKey]}`;
@@ -86,15 +126,20 @@ const agregarRegistro = async () => {
     encabezados.value.forEach(columna => {
       const valor = nuevoRegistro.value[columna.column_name];
       if (valor !== undefined && valor !== null && valor !== '') {
-        datos[columna.column_name] = valor;
+        // Convertir a número los campos numéricos
+        if (['precio', 'existencia', 'id_proveedor'].includes(columna.column_name)) {
+          datos[columna.column_name] = Number(valor);
+        } else {
+          datos[columna.column_name] = valor;
+        }
       }
     });
 
-    if (tablaSeleccionada.value === 'producto' && !datos.id_proveedor) {
-      throw new Error("Debe especificar un proveedor para el producto");
+    // Validar datos antes de enviar
+    const errores = validarDatos(datos);
+    if (errores.length > 0) {
+      throw new Error(errores.join('\n'));
     }
-    
-    if (Object.keys(datos).length === 0) throw new Error("No hay datos válidos");
     
     const url = `http://localhost:3000/api/agregar/${tablaSeleccionada.value}`;
     await axios.post(url, datos);
