@@ -15,7 +15,6 @@ const nombreAEliminar = ref('');
 const mostrarModalAgregar = ref(false);
 const nuevoRegistro = ref({});
 
-// Campos requeridos para cada tabla
 const camposRequeridos = {
   producto: ['nombre', 'precio', 'existencia', 'id_proveedor'],
   proveedor: ['nombre', 'rfc']
@@ -37,14 +36,12 @@ const mostrarEditar = (registro) => {
 const validarDatos = (datos) => {
   const errores = [];
   
-  // Validar campos requeridos
   camposRequeridos[tablaSeleccionada.value].forEach(campo => {
     if (!datos[campo] && datos[campo] !== 0) {
       errores.push(`El campo ${campo} es requerido`);
     }
   });
   
-  // Validaciones específicas para productos
   if (tablaSeleccionada.value === 'producto') {
     if (datos.precio <= 0) {
       errores.push('El precio debe ser mayor que 0');
@@ -54,7 +51,6 @@ const validarDatos = (datos) => {
     }
   }
   
-  // Validaciones específicas para proveedores
   if (tablaSeleccionada.value === 'proveedor' && datos.rfc && datos.rfc.length !== 13) {
     errores.push('El RFC debe tener 13 caracteres');
   }
@@ -69,7 +65,6 @@ const editarRegistro = async () => {
     
     if (!id) throw new Error("ID no válido");
     
-    // Validar datos antes de enviar
     const errores = validarDatos(nuevoRegistro.value);
     if (errores.length > 0) {
       throw new Error(errores.join('\n'));
@@ -88,8 +83,7 @@ const editarRegistro = async () => {
 
 const mostrarEliminar = (registro) => {
   const idKey = tablaSeleccionada.value === "producto" ? "id_producto" : "id_proveedor";
-  const nombreKey = "nombre"; // Corregido: ahora usa simplemente 'nombre'
-  
+  const nombreKey = "nombre";
   idAEliminar.value = registro[idKey];
   nombreAEliminar.value = registro[nombreKey] || `Registro ${registro[idKey]}`;
   mostrarModalEliminar.value = true;
@@ -126,7 +120,6 @@ const agregarRegistro = async () => {
     encabezados.value.forEach(columna => {
       const valor = nuevoRegistro.value[columna.column_name];
       if (valor !== undefined && valor !== null && valor !== '') {
-        // Convertir a número los campos numéricos
         if (['precio', 'existencia', 'id_proveedor'].includes(columna.column_name)) {
           datos[columna.column_name] = Number(valor);
         } else {
@@ -135,7 +128,6 @@ const agregarRegistro = async () => {
       }
     });
 
-    // Validar datos antes de enviar
     const errores = validarDatos(datos);
     if (errores.length > 0) {
       throw new Error(errores.join('\n'));
